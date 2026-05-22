@@ -1,4 +1,4 @@
-import type { Diary, DiaryFieldKey, AiSettings } from './types';
+import type { Diary, DiaryFieldKey, AiSettings, ProjectProfile } from './types';
 
 export const FIELD_DEFS: { key: DiaryFieldKey; label: string; placeholder: string; rows: number }[] = [
   {
@@ -106,6 +106,7 @@ export function emptyDiary(date: string): Diary {
     issuesAndActions: '',
     otherMatters: '',
     chiefEngineerComments: '',
+    specialistSupervisorComments: '',
   };
 }
 
@@ -115,4 +116,13 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   apiKey: '',
   model: 'qwen2.5:7b',
   glossary: '',
+};
+
+export const DEFAULT_PROJECT_PROFILE: ProjectProfile = {
+  projectName: '',
+  buildUnit: '',
+  contractorUnit: '',
+  supervisorUnit: '',
+  chiefSupervisor: '',
+  writer: '',
 };

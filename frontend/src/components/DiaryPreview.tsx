@@ -17,6 +17,11 @@ export function DiaryPreview({ diary }: { diary: Diary }) {
     lines.push(diary[f.key] || '（空）');
     lines.push('');
   }
+  if (diary.specialistSupervisorComments) {
+    lines.push('【专业监理工程师评语】');
+    lines.push(diary.specialistSupervisorComments);
+    lines.push('');
+  }
   if (diary.chiefEngineerComments) {
     lines.push('【总监理工程师评语】');
     lines.push(diary.chiefEngineerComments);

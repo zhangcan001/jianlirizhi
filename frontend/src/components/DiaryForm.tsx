@@ -79,6 +79,16 @@ export function DiaryForm({ diary, settings, onUpdate, replaceDiary, snapshotAiF
         ))}
 
         <label className="field block">
+          <span>专业监理工程师评语</span>
+          <textarea
+            rows={3}
+            placeholder="本人作为专监对今日工作的总结/重点强调/待跟进项。"
+            value={diary.specialistSupervisorComments}
+            onChange={(e) => onUpdate('specialistSupervisorComments', e.target.value)}
+          />
+        </label>
+
+        <label className="field block">
           <span>总监理工程师评语</span>
           <textarea
             rows={3}

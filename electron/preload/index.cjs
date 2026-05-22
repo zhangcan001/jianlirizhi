@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('diaryApi', {
   exportDocx: (payload) => ipcRenderer.invoke('diary:export-docx', payload),
   exportDocxToDir: (payload) => ipcRenderer.invoke('diary:export-docx-to-dir', payload),
+  exportMonth: (payload) => ipcRenderer.invoke('diary:export-month', payload),
   selectExportDir: () => ipcRenderer.invoke('diary:select-export-dir'),
   listDiaries: () => ipcRenderer.invoke('diary:list'),
   searchDiaries: (payload) => ipcRenderer.invoke('diary:search', payload),

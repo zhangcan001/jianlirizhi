@@ -25,9 +25,9 @@ const AI_FIELDS: DiaryFieldKey[] = [
   'otherMatters',
 ];
 
-export function useDiaryStore() {
+export function useDiaryStore(defaults?: { writer?: string }) {
   const [currentDate, setCurrentDate] = useState<string>(todayIso());
-  const [diary, setDiary] = useState<Diary>(() => emptyDiary(todayIso()));
+  const [diary, setDiary] = useState<Diary>(() => ({ ...emptyDiary(todayIso()), writer: defaults?.writer || '' }));
   const [list, setList] = useState<DiarySummary[]>([]);
   const [dirty, setDirty] = useState(false);
   const [pendingDraft, setPendingDraft] = useState<PendingDraft | null>(null);
@@ -50,7 +50,7 @@ export function useDiaryStore() {
     const [existing, draft] = await Promise.all([api.getDiary(date), api.getDraft(date)]);
     const base = existing
       ? { ...emptyDiary(date), ...existing, date, weekday: existing.weekday || weekdayOf(date) }
-      : emptyDiary(date);
+      : { ...emptyDiary(date), writer: defaults?.writer || '' };
     setDiary(base);
     setDirty(false);
 
@@ -93,6 +93,12 @@ export function useDiaryStore() {
       if (draftTimer.current) window.clearTimeout(draftTimer.current);
     };
   }, [diary, dirty]);
+
+  const writerDefault = defaults?.writer || '';
+  useEffect(() => {
+    if (!writerDefault) return;
+    setDiary((prev) => (prev.writer ? prev : { ...prev, writer: writerDefault }));
+  }, [writerDefault]);
 
   const updateField = useCallback(<K extends keyof Diary>(key: K, value: Diary[K]) => {
     setDiary((prev) => ({ ...prev, [key]: value }));

@@ -791,6 +791,44 @@ ipcMain.handle('diary:export-docx-to-dir', async (_event, payload) => {
   return { canceled: false, filePath };
 });
 
+ipcMain.handle('diary:export-month', async (_event, { month, exportDir }) => {
+  if (!/^\d{4}-\d{2}$/.test(String(month || ''))) {
+    throw new Error('月份格式应为 YYYY-MM');
+  }
+  let dir = exportDir;
+  if (!dir) {
+    const pick = await dialog.showOpenDialog({
+      title: `选择导出目录（${month}）`,
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (pick.canceled || !pick.filePaths?.[0]) return { canceled: true };
+    dir = pick.filePaths[0];
+  }
+  fs.mkdirSync(dir, { recursive: true });
+
+  const all = diaryDb.listDiaries();
+  const dates = all.filter((it) => String(it.date).startsWith(`${month}-`)).map((it) => it.date);
+  if (dates.length === 0) {
+    return { canceled: false, dir, count: 0, files: [] };
+  }
+  const files = [];
+  const errors = [];
+  for (const d of dates) {
+    try {
+      const diary = diaryDb.getDiary(d);
+      if (!diary) continue;
+      const safeDate = String(d).replace(/[\\/:*?"<>|]/g, '-');
+      const filePath = path.join(dir, `个人监理日记${safeDate}.docx`);
+      const buffer = renderDiaryDocx(diary, getTemplatePath());
+      fs.writeFileSync(filePath, buffer);
+      files.push(filePath);
+    } catch (e) {
+      errors.push({ date: d, message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return { canceled: false, dir, count: files.length, files, errors };
+});
+
 ipcMain.handle('diary:list', async () => {
   return diaryDb.listDiaries();
 });

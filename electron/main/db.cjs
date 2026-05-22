@@ -32,6 +32,7 @@ const TEXT_COLUMNS = [
   'issuesAndActions',
   'otherMatters',
   'chiefEngineerComments',
+  'specialistSupervisorComments',
 ];
 
 const SEARCHABLE_COLUMNS = [
@@ -47,6 +48,7 @@ const SEARCHABLE_COLUMNS = [
   'issuesAndActions',
   'otherMatters',
   'chiefEngineerComments',
+  'specialistSupervisorComments',
   'writer',
   'city',
 ];
@@ -72,6 +74,14 @@ function open(dataDir) {
     );
     CREATE INDEX IF NOT EXISTS idx_diaries_updated ON diaries(updatedAt DESC);
   `);
+
+  const existing = new Set(db.prepare('PRAGMA table_info(diaries)').all().map((r) => r.name));
+  for (const c of TEXT_COLUMNS) {
+    if (c === 'date') continue;
+    if (!existing.has(c)) {
+      db.exec(`ALTER TABLE diaries ADD COLUMN "${c}" TEXT NOT NULL DEFAULT ''`);
+    }
+  }
   return db;
 }
 

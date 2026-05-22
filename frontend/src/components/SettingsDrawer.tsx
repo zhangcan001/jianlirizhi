@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AiSettings } from '../types';
+import type { AiSettings, ProjectProfile } from '../types';
 import { api } from '../api';
 
 interface Props {
   open: boolean;
   settings: AiSettings;
   update: <K extends keyof AiSettings>(key: K, value: AiSettings[K]) => void;
+  project: ProjectProfile;
+  updateProject: <K extends keyof ProjectProfile>(key: K, value: ProjectProfile[K]) => void;
   onClose: () => void;
 }
 
-export function SettingsDrawer({ open, settings, update, onClose }: Props) {
+export function SettingsDrawer({ open, settings, update, project, updateProject, onClose }: Props) {
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState<string>('');
@@ -55,13 +57,68 @@ export function SettingsDrawer({ open, settings, update, onClose }: Props) {
       {open && <div className="drawer-mask" onClick={onClose} />}
       <div className={`drawer${open ? ' open' : ''}`}>
         <div className="drawer-head">
-          <h2>AI 设置</h2>
+          <h2>设置</h2>
           <button className="ghost" type="button" onClick={onClose}>
             关闭
           </button>
         </div>
         <div className="drawer-body">
-          <label className="field block">
+          <section className="drawer-section">
+            <h3 className="drawer-section-title">项目档案</h3>
+            <label className="field block">
+              <span>工程名称</span>
+              <input
+                type="text"
+                value={project.projectName}
+                onChange={(e) => updateProject('projectName', e.target.value)}
+                placeholder="例如：XX综合楼机电安装工程"
+              />
+            </label>
+            <label className="field block">
+              <span>建设单位</span>
+              <input
+                type="text"
+                value={project.buildUnit}
+                onChange={(e) => updateProject('buildUnit', e.target.value)}
+              />
+            </label>
+            <label className="field block">
+              <span>承包单位（总承包）</span>
+              <input
+                type="text"
+                value={project.contractorUnit}
+                onChange={(e) => updateProject('contractorUnit', e.target.value)}
+              />
+            </label>
+            <label className="field block">
+              <span>监理单位</span>
+              <input
+                type="text"
+                value={project.supervisorUnit}
+                onChange={(e) => updateProject('supervisorUnit', e.target.value)}
+              />
+            </label>
+            <label className="field block">
+              <span>总监理工程师</span>
+              <input
+                type="text"
+                value={project.chiefSupervisor}
+                onChange={(e) => updateProject('chiefSupervisor', e.target.value)}
+              />
+            </label>
+            <label className="field block">
+              <span>默认记录人（新建日记自动填入）</span>
+              <input
+                type="text"
+                value={project.writer}
+                onChange={(e) => updateProject('writer', e.target.value)}
+              />
+            </label>
+          </section>
+
+          <section className="drawer-section">
+            <h3 className="drawer-section-title">AI 设置</h3>
+            <label className="field block">
             <span>Provider</span>
             <select
               value={settings.provider}
@@ -144,8 +201,9 @@ export function SettingsDrawer({ open, settings, update, onClose }: Props) {
           </label>
           <p className="drawer-hint">
             术语会自动拼到 AI prompt 头部，模型优先选用你这里写的单位/班组名，不再自己编。<br />
-            设置自动保存在本地 localStorage。本地 Ollama 用法：先 <code>ollama serve</code>，再 <code>ollama pull qwen2.5:7b</code>。
+            设置自动保存在本地。本地 Ollama 用法：先 <code>ollama serve</code>，再 <code>ollama pull qwen2.5:7b</code>。
           </p>
+          </section>
         </div>
       </div>
     </>

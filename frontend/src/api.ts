@@ -10,6 +10,7 @@ export const api: DiaryApi = (() => {
   return {
     exportDocx: missing,
     exportDocxToDir: missing,
+    exportMonth: missing,
     selectExportDir: missing,
     listDiaries: missing,
     searchDiaries: missing,

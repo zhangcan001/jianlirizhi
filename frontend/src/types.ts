@@ -34,6 +34,7 @@ export interface Diary {
   issuesAndActions: string;
   otherMatters: string;
   chiefEngineerComments: string;
+  specialistSupervisorComments: string;
   updatedAt?: string;
 }
 
@@ -52,6 +53,15 @@ export interface AiSettings {
   apiKey: string;
   model: string;
   glossary: string;
+}
+
+export interface ProjectProfile {
+  projectName: string;
+  buildUnit: string;
+  contractorUnit: string;
+  supervisorUnit: string;
+  chiefSupervisor: string;
+  writer: string;
 }
 
 export interface WeatherResult {
@@ -77,6 +87,13 @@ export type AiEvent =
 export interface DiaryApi {
   exportDocx: (payload: Diary) => Promise<{ canceled: boolean; filePath?: string }>;
   exportDocxToDir: (payload: Diary & { exportDir: string }) => Promise<{ canceled: boolean; filePath?: string }>;
+  exportMonth: (payload: { month: string; exportDir?: string }) => Promise<{
+    canceled: boolean;
+    dir?: string;
+    count?: number;
+    files?: string[];
+    errors?: { date: string; message: string }[];
+  }>;
   selectExportDir: () => Promise<{ canceled: boolean; dir?: string }>;
   listDiaries: () => Promise<DiarySummary[]>;
   searchDiaries: (payload: { query: string; limit?: number }) => Promise<DiarySummary[]>;

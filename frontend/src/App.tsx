@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useDiaryStore } from './hooks/useDiaryStore';
 import { useSettings } from './hooks/useSettings';
+import { useProject } from './hooks/useProject';
 import { HistoryList } from './components/HistoryList';
 import { DiaryForm } from './components/DiaryForm';
 import { DiaryPreview } from './components/DiaryPreview';
@@ -15,10 +16,23 @@ export type NoticeState =
   | { kind: 'error'; message: string };
 
 export function App() {
-  const store = useDiaryStore();
+  const { project, update: updateProject } = useProject();
+  const store = useDiaryStore({ writer: project.writer });
   const { settings, update: updateSetting } = useSettings();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notice, setNotice] = useState<NoticeState>({ kind: 'idle' });
+
+  const mergedSettings = useMemo(() => {
+    const projectLines: string[] = [];
+    if (project.projectName) projectLines.push(`工程名称：${project.projectName}`);
+    if (project.buildUnit) projectLines.push(`建设单位：${project.buildUnit}`);
+    if (project.contractorUnit) projectLines.push(`总承包：${project.contractorUnit}`);
+    if (project.supervisorUnit) projectLines.push(`监理单位：${project.supervisorUnit}`);
+    if (project.chiefSupervisor) projectLines.push(`总监理工程师：${project.chiefSupervisor}`);
+    if (projectLines.length === 0) return settings;
+    const preamble = `【项目档案】\n${projectLines.join('\n')}\n`;
+    return { ...settings, glossary: settings.glossary ? `${preamble}\n${settings.glossary}` : preamble };
+  }, [settings, project]);
 
   const flash = useCallback((next: NoticeState, ms = 2400) => {
     setNotice(next);
@@ -95,6 +109,35 @@ export function App() {
     }
   };
 
+  const handleExportMonth = async () => {
+    const defaultMonth = (store.diary.date || new Date().toISOString().slice(0, 10)).slice(0, 7);
+    const input = window.prompt('输入要导出的月份（YYYY-MM）', defaultMonth);
+    if (!input) return;
+    const month = input.trim();
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      onError('月份格式应为 YYYY-MM');
+      return;
+    }
+    let dir = localStorage.getItem('exportDir') || undefined;
+    onBusy(true, `批量导出 ${month}…`);
+    try {
+      const res = await api.exportMonth({ month, exportDir: dir });
+      if (res.canceled) {
+        setNotice({ kind: 'idle' });
+        return;
+      }
+      if (res.dir) localStorage.setItem('exportDir', res.dir);
+      if ((res.count ?? 0) === 0) {
+        onError(`${month} 没有日志记录`);
+        return;
+      }
+      const errs = res.errors?.length ? `，${res.errors.length} 条失败` : '';
+      onSuccess(`已导出 ${res.count} 篇到 ${res.dir}${errs}`);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -124,6 +167,9 @@ export function App() {
           </button>
           <button className="ghost" type="button" onClick={handleExportToDir}>
             导出到目录
+          </button>
+          <button className="ghost" type="button" onClick={handleExportMonth} title="按月批量导出">
+            导出本月
           </button>
           <button className="ghost" type="button" onClick={handleExport}>
             导出 docx
@@ -184,7 +230,7 @@ export function App() {
         />
         <DiaryForm
           diary={store.diary}
-          settings={settings}
+          settings={mergedSettings}
           onUpdate={store.updateField}
           replaceDiary={store.replaceDiary}
           snapshotAiFields={store.snapshotAiFields}
@@ -199,6 +245,8 @@ export function App() {
         open={drawerOpen}
         settings={settings}
         update={updateSetting}
+        project={project}
+        updateProject={updateProject}
         onClose={() => setDrawerOpen(false)}
       />
     </div>
