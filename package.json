@@ -4,13 +4,12 @@
   "description": "Windows desktop app for generating personal supervision diaries.",
   "main": "electron/main/index.cjs",
   "license": "ISC",
-  "type": "module",
   "scripts": {
-    "dev:web": "vite --config frontend/vite.config.ts",
-    "dev:electron": "wait-on tcp:127.0.0.1:5173 && electron .",
+    "dev:web": "vite --config frontend/vite.config.mts",
+    "dev:electron": "wait-on tcp:127.0.0.1:5173 && node scripts/launch-electron.cjs",
     "dev": "concurrently -k -n web,electron -c blue,magenta \"npm:dev:web\" \"npm:dev:electron\"",
-    "build": "vite build --config frontend/vite.config.ts",
-    "preview": "vite preview --config frontend/vite.config.ts"
+    "build": "vite build --config frontend/vite.config.mts",
+    "preview": "vite preview --config frontend/vite.config.mts"
   },
   "dependencies": {
     "docxtemplater": "^3.68.6",
@@ -24,6 +23,7 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^9.0.0",
+    "cross-env": "^10.1.0",
     "electron": "^32.0.0",
     "typescript": "^5.6.0",
     "vite": "^7.0.0",
