@@ -106,6 +106,19 @@ export function App() {
           </div>
         </div>
         <div className="actions">
+          {store.aiSnapshot && store.aiSnapshot.date === store.diary.date && (
+            <button
+              className="ghost"
+              type="button"
+              title="撤销最近一次 AI 覆写"
+              onClick={() => {
+                store.undoAi();
+                onSuccess('已撤销 AI 覆写');
+              }}
+            >
+              ↺ 撤销 AI
+            </button>
+          )}
           <button className="ghost" type="button" onClick={handleChangeExportDir}>
             导出目录…
           </button>
@@ -126,6 +139,42 @@ export function App() {
 
       <Notice state={notice} />
 
+      {store.pendingDraft && (
+        <div className="draft-banner">
+          <div>
+            <strong>检测到未保存草稿</strong>
+            <span className="draft-time">
+              草稿时间 {store.pendingDraft.updatedAt.replace('T', ' ').slice(0, 19)}
+              {store.pendingDraft.savedUpdatedAt
+                ? `，已保存版本 ${store.pendingDraft.savedUpdatedAt.replace('T', ' ').slice(0, 19)}`
+                : '，尚未保存过'}
+            </span>
+          </div>
+          <div className="draft-actions">
+            <button
+              className="primary"
+              type="button"
+              onClick={() => {
+                void store.acceptDraft();
+                onSuccess('已恢复草稿（仍需点保存才会写入）');
+              }}
+            >
+              恢复草稿
+            </button>
+            <button
+              className="ghost"
+              type="button"
+              onClick={() => {
+                void store.discardDraft();
+                onSuccess('已丢弃草稿');
+              }}
+            >
+              丢弃
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="workspace">
         <HistoryList
           list={store.list}
@@ -138,6 +187,7 @@ export function App() {
           settings={settings}
           onUpdate={store.updateField}
           replaceDiary={store.replaceDiary}
+          snapshotAiFields={store.snapshotAiFields}
           onBusy={onBusy}
           onError={onError}
           onSuccess={onSuccess}

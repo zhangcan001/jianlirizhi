@@ -6,6 +6,7 @@ interface Props {
   diary: Diary;
   settings: AiSettings;
   replaceDiary: (next: Partial<Diary>) => void;
+  snapshotAiFields: () => void;
   onBusy: (busy: boolean, msg?: string) => void;
   onError: (msg: string) => void;
   onSuccess: (msg: string) => void;
@@ -25,12 +26,13 @@ const ALLOWED_KEYS: (keyof Diary)[] = [
   'otherMatters',
 ];
 
-export function AiBar({ diary, settings, replaceDiary, onBusy, onError, onSuccess }: Props) {
+export function AiBar({ diary, settings, replaceDiary, snapshotAiFields, onBusy, onError, onSuccess }: Props) {
   const { state, run, abort } = useAiJob();
   const [failure, setFailure] = useState<{ message: string; raw: string } | null>(null);
 
   const start = (mode: AiMode) => {
     setFailure(null);
+    snapshotAiFields();
     onBusy(true, mode === 'polish' ? 'AI 正在润色…' : 'AI 正在分析全部字段…');
     run(
       { mode, diary, settings },

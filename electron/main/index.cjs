@@ -644,6 +644,45 @@ async function runAiJob({ jobId, mode, diary, settings, webContents }) {
   }
 }
 
+function getDraftsDir() {
+  const dir = path.join(app.getPath('userData'), 'drafts');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function draftPathFor(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+    throw new Error('非法日期');
+  }
+  return path.join(getDraftsDir(), `${date}.json`);
+}
+
+ipcMain.handle('draft:save', async (_event, { date, payload }) => {
+  const file = draftPathFor(date);
+  fs.writeFileSync(file, JSON.stringify({ payload, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
+  return { ok: true };
+});
+
+ipcMain.handle('draft:get', async (_event, date) => {
+  try {
+    const file = draftPathFor(date);
+    if (!fs.existsSync(file)) return null;
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('draft:clear', async (_event, date) => {
+  try {
+    const file = draftPathFor(date);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+});
+
 ipcMain.handle('diary:export-docx', async (_event, payload) => {
   const defaultName = `个人监理日记${String(payload.date || '').replaceAll('-', '-') || '未命名'}.docx`;
   const result = await dialog.showSaveDialog({

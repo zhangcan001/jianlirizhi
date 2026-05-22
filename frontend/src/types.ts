@@ -84,6 +84,9 @@ export interface DiaryApi {
   deleteDiary: (date: string) => Promise<{ ok: boolean }>;
   getDataPath: () => Promise<string>;
   fetchWeather: (payload: { city: string; date: string }) => Promise<WeatherResult>;
+  saveDraft: (payload: { date: string; payload: Diary }) => Promise<{ ok: boolean }>;
+  getDraft: (date: string) => Promise<{ payload: Diary; updatedAt: string } | null>;
+  clearDraft: (date: string) => Promise<{ ok: boolean; error?: string }>;
   startAi: (payload: { mode: AiMode; diary: Diary; settings: AiSettings }) => Promise<string>;
   abortAi: (jobId: string) => Promise<{ ok: boolean }>;
   listOllamaModels: (endpoint: string) => Promise<{ ok: boolean; models: string[]; error?: string }>;

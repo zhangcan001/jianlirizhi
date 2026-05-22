@@ -9,12 +9,13 @@ interface Props {
   settings: AiSettings;
   onUpdate: <K extends keyof Diary>(key: K, value: Diary[K]) => void;
   replaceDiary: (next: Partial<Diary>) => void;
+  snapshotAiFields: () => void;
   onBusy: (busy: boolean, msg?: string) => void;
   onError: (msg: string) => void;
   onSuccess: (msg: string) => void;
 }
 
-export function DiaryForm({ diary, settings, onUpdate, replaceDiary, onBusy, onError, onSuccess }: Props) {
+export function DiaryForm({ diary, settings, onUpdate, replaceDiary, snapshotAiFields, onBusy, onError, onSuccess }: Props) {
   return (
     <section className="form">
       <div className="panel">
@@ -57,6 +58,7 @@ export function DiaryForm({ diary, settings, onUpdate, replaceDiary, onBusy, onE
           diary={diary}
           settings={settings}
           replaceDiary={replaceDiary}
+          snapshotAiFields={snapshotAiFields}
           onBusy={onBusy}
           onError={onError}
           onSuccess={onSuccess}
