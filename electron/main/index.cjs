@@ -1,9 +1,10 @@
 // @ts-check
-const { app, BrowserWindow, Menu, dialog, ipcMain, safeStorage } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, safeStorage, session, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { renderDiaryDocx } = require('./docx.cjs');
 const diaryDb = require('./db.cjs');
+const logger = require('./logger.cjs');
 
 const isDev = !app.isPackaged;
 
@@ -14,6 +15,14 @@ function createAppMenu() {
       label: '文件',
       submenu: [
         { role: 'reload', label: '刷新' },
+        { type: 'separator' },
+        {
+          label: '打开日志目录',
+          click: () => {
+            const dir = logger.getDir();
+            if (dir) shell.openPath(dir).catch(() => { /* ignore */ });
+          }
+        },
         { type: 'separator' },
         { role: 'quit', label: '退出' }
       ]
@@ -63,7 +72,27 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false
+    }
+  });
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) {
+      shell.openExternal(url).catch(() => { /* ignore */ });
+    }
+    return { action: 'deny' };
+  });
+
+  win.webContents.on('will-navigate', (event, url) => {
+    const allowed = isDev ? 'http://127.0.0.1:5173' : 'file://';
+    if (!url.startsWith(allowed)) {
+      event.preventDefault();
+      if (/^https?:\/\//i.test(url)) {
+        shell.openExternal(url).catch(() => { /* ignore */ });
+      }
     }
   });
 
@@ -72,6 +101,26 @@ function createWindow() {
   } else {
     win.loadFile(path.join(__dirname, '../../dist-web/index.html'));
   }
+}
+
+function installCsp() {
+  const csp = isDev
+    ? "default-src 'self' http://127.0.0.1:5173 ws://127.0.0.1:5173; script-src 'self' http://127.0.0.1:5173 'unsafe-inline' 'unsafe-eval'; style-src 'self' http://127.0.0.1:5173 'unsafe-inline'; img-src 'self' data: http://127.0.0.1:5173; font-src 'self' data: http://127.0.0.1:5173; connect-src 'self' http://127.0.0.1:5173 ws://127.0.0.1:5173"
+    : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = { ...(details.responseHeaders || {}) };
+    headers['Content-Security-Policy'] = [csp];
+    callback({ responseHeaders: headers });
+  });
+
+  app.on('web-contents-created', (_event, contents) => {
+    contents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:\/\//i.test(url)) {
+        shell.openExternal(url).catch(() => { /* ignore */ });
+      }
+      return { action: 'deny' };
+    });
+  });
 }
 
 function getTemplatePath() {
@@ -902,6 +951,11 @@ ipcMain.handle('ai:abort', async (_event, jobId) => {
 
 app.whenReady().then(() => {
   try {
+    logger.start(path.join(app.getPath('userData'), 'logs'));
+  } catch (e) {
+    console.error('[logger] start failed:', e);
+  }
+  try {
     diaryDb.open(getDataDir());
     const result = diaryDb.migrateFromJson(getDiaryStorePath());
     if (result.migrated > 0) {
@@ -911,6 +965,7 @@ app.whenReady().then(() => {
     console.error('[db] 启动迁移失败：', e);
   }
   createAppMenu();
+  installCsp();
   createWindow();
 
   app.on('activate', () => {
