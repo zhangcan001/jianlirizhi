@@ -114,4 +114,5 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   endpoint: 'http://127.0.0.1:11434',
   apiKey: '',
   model: 'qwen2.5:7b',
+  glossary: '',
 };

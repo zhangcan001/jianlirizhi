@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('diaryApi', {
   fetchWeather: (payload) => ipcRenderer.invoke('weather:fetch', payload),
   startAi: (payload) => ipcRenderer.invoke('ai:start', payload),
   abortAi: (jobId) => ipcRenderer.invoke('ai:abort', jobId),
+  listOllamaModels: (endpoint) => ipcRenderer.invoke('ai:list-ollama-models', endpoint),
   onAiEvent: (handler) => {
     const listener = (_e, evt) => handler(evt);
     ipcRenderer.on('ai:event', listener);

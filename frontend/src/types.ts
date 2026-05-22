@@ -51,6 +51,7 @@ export interface AiSettings {
   endpoint: string;
   apiKey: string;
   model: string;
+  glossary: string;
 }
 
 export interface WeatherResult {
@@ -85,6 +86,7 @@ export interface DiaryApi {
   fetchWeather: (payload: { city: string; date: string }) => Promise<WeatherResult>;
   startAi: (payload: { mode: AiMode; diary: Diary; settings: AiSettings }) => Promise<string>;
   abortAi: (jobId: string) => Promise<{ ok: boolean }>;
+  listOllamaModels: (endpoint: string) => Promise<{ ok: boolean; models: string[]; error?: string }>;
   onAiEvent: (handler: (evt: AiEvent) => void) => () => void;
 }
 

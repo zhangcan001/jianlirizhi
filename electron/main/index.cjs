@@ -328,7 +328,7 @@ const ANTI_HALLUCINATION_RULES = [
   '8. 不得为了凑齐人数合计而虚构班组；合计必须等于用户输入中各单位/班组人数之和。'
 ].join('\n');
 
-function buildAiPrompt(mode, diary) {
+function buildAiPrompt(mode, diary, glossary) {
   const fieldList = [
     'constructionStatus',
     'contractorPersonnel',
@@ -410,11 +410,24 @@ function buildAiPrompt(mode, diary) {
 
   const formalStyleRule = '【语言风格】使用监理日记正式语言，客观、规范、简洁；多项内容用 1. 2. 3. 编号；不要口语化总结。';
 
-  return [
+  const glossaryBlock = (() => {
+    const text = String(glossary || '').trim();
+    if (!text) return '';
+    return [
+      '【本项目术语 - 优先使用，禁止替换为其它名称】',
+      '以下是用户为本项目登记的单位、班组、机械、工种等术语。当用户输入提到对应实体时，必须使用这里的名称；不得改写、缩写或替换成同义词。但仍然不得把这里出现的名称无中生有地加到用户没有提到的情况中。',
+      text
+    ].join('\n');
+  })();
+
+  const sections = [
     '你是一名经验丰富的中国建设工程监理工程师，正在协助填写《个人监理日记》。',
     '请根据用户提供的监理日记草稿，按下列规则输出每个字段的内容。',
     formalStyleRule,
     ANTI_HALLUCINATION_RULES,
+  ];
+  if (glossaryBlock) sections.push(glossaryBlock);
+  sections.push(
     personnelRules,
     machineryRules,
     constructionStatusRules,
@@ -427,7 +440,8 @@ function buildAiPrompt(mode, diary) {
     '每个字段的值都是纯文本字符串，可以包含换行 \\n 和 1. 2. 3. 编号；不要在值里嵌套 JSON 或 Markdown 代码块。',
     '当前草稿（JSON）：',
     JSON.stringify(diary, null, 2)
-  ].join('\n\n');
+  );
+  return sections.join('\n\n');
 }
 
 function buildDiaryCoreAnalysisPrompt(input) {
@@ -586,7 +600,7 @@ async function runAiJob({ jobId, mode, diary, settings, webContents }) {
   };
   let rawText = '';
   try {
-    const prompt = buildAiPrompt(mode, diary);
+    const prompt = buildAiPrompt(mode, diary, settings?.glossary);
     const provider = settings?.provider || 'ollama';
     const onDelta = (piece) => send('chunk', piece);
     rawText =
@@ -726,6 +740,23 @@ ipcMain.handle('diary:delete', async (_event, date) => {
 ipcMain.handle('diary:data-path', async () => getDiaryStorePath());
 
 ipcMain.handle('weather:fetch', async (_event, payload) => fetchWeatherByCity(payload));
+
+ipcMain.handle('ai:list-ollama-models', async (_event, endpoint) => {
+  const base = String(endpoint || 'http://127.0.0.1:11434').replace(/\/$/, '');
+  try {
+    const response = await fetch(`${base}/api/tags`);
+    if (!response.ok) {
+      return { ok: false, error: `Ollama 响应 ${response.status}`, models: [] };
+    }
+    const data = await response.json();
+    const models = Array.isArray(data?.models)
+      ? data.models.map((m) => m.name).filter(Boolean)
+      : [];
+    return { ok: true, models };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e), models: [] };
+  }
+});
 
 ipcMain.handle('ai:start', async (event, payload) => {
   const jobId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

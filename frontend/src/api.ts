@@ -19,6 +19,7 @@ export const api: DiaryApi = (() => {
     fetchWeather: missing,
     startAi: missing,
     abortAi: missing,
+    listOllamaModels: missing,
     onAiEvent: () => () => {},
   } as DiaryApi;
 })();
