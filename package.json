@@ -1,0 +1,16 @@
+{
+  "name": "supervision-diary-generator",
+  "version": "1.0.0",
+  "description": "Windows desktop app for generating personal supervision diaries.",
+  "main": "electron/main/index.cjs",
+  "author": "张灿",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "docxtemplater": "^3.68.6",
+    "lucide-react": "^1.14.0",
+    "pizzip": "^3.2.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  }
+}
