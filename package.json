@@ -12,6 +12,7 @@
     "preview": "vite preview --config frontend/vite.config.mts"
   },
   "dependencies": {
+    "better-sqlite3": "^11.10.0",
     "docxtemplater": "^3.68.6",
     "lucide-react": "^0.460.0",
     "pizzip": "^3.2.0",
@@ -19,6 +20,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",

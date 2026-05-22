@@ -12,6 +12,7 @@ export const api: DiaryApi = (() => {
     exportDocxToDir: missing,
     selectExportDir: missing,
     listDiaries: missing,
+    searchDiaries: missing,
     saveDiary: missing,
     getDiary: missing,
     deleteDiary: missing,
@@ -23,6 +24,9 @@ export const api: DiaryApi = (() => {
     startAi: missing,
     abortAi: missing,
     listOllamaModels: missing,
+    getSecret: missing,
+    setSecret: missing,
+    clearSecret: missing,
     onAiEvent: () => () => {},
   } as DiaryApi;
 })();

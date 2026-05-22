@@ -1,7 +1,8 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, safeStorage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { renderDiaryDocx } = require('./docx.cjs');
+const diaryDb = require('./db.cjs');
 
 const isDev = !app.isPackaged;
 
@@ -683,6 +684,70 @@ ipcMain.handle('draft:clear', async (_event, date) => {
   }
 });
 
+function getSecretsFile() {
+  return path.join(app.getPath('userData'), 'secrets.json');
+}
+
+function readSecretsRaw() {
+  try {
+    const f = getSecretsFile();
+    if (!fs.existsSync(f)) return {};
+    const obj = JSON.parse(fs.readFileSync(f, 'utf8'));
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSecretsRaw(obj) {
+  fs.writeFileSync(getSecretsFile(), JSON.stringify(obj, null, 2), 'utf8');
+}
+
+const SECRET_NAMES = new Set(['apiKey']);
+
+ipcMain.handle('secret:get', async (_event, name) => {
+  if (!SECRET_NAMES.has(name)) return { ok: false, error: '未知 secret' };
+  const all = readSecretsRaw();
+  const entry = all[name];
+  if (!entry) return { ok: true, value: '' };
+  if (entry.encrypted && safeStorage.isEncryptionAvailable()) {
+    try {
+      const buf = Buffer.from(entry.value, 'base64');
+      return { ok: true, value: safeStorage.decryptString(buf) };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+  return { ok: true, value: entry.value || '' };
+});
+
+ipcMain.handle('secret:set', async (_event, { name, value }) => {
+  if (!SECRET_NAMES.has(name)) return { ok: false, error: '未知 secret' };
+  const all = readSecretsRaw();
+  const v = typeof value === 'string' ? value : '';
+  if (!v) {
+    delete all[name];
+    writeSecretsRaw(all);
+    return { ok: true };
+  }
+  if (safeStorage.isEncryptionAvailable()) {
+    const buf = safeStorage.encryptString(v);
+    all[name] = { encrypted: true, value: buf.toString('base64') };
+  } else {
+    all[name] = { encrypted: false, value: v };
+  }
+  writeSecretsRaw(all);
+  return { ok: true, encrypted: safeStorage.isEncryptionAvailable() };
+});
+
+ipcMain.handle('secret:clear', async (_event, name) => {
+  if (!SECRET_NAMES.has(name)) return { ok: false, error: '未知 secret' };
+  const all = readSecretsRaw();
+  delete all[name];
+  writeSecretsRaw(all);
+  return { ok: true };
+});
+
 ipcMain.handle('diary:export-docx', async (_event, payload) => {
   const defaultName = `个人监理日记${String(payload.date || '').replaceAll('-', '-') || '未命名'}.docx`;
   const result = await dialog.showSaveDialog({
@@ -727,56 +792,33 @@ ipcMain.handle('diary:export-docx-to-dir', async (_event, payload) => {
 });
 
 ipcMain.handle('diary:list', async () => {
-  const store = readDiaryStore();
-  return Object.values(store)
-    .map((diary) => ({
-      date: diary.date,
-      weekday: diary.weekday,
-      title: getDiaryTitle(diary),
-      updatedAt: diary.updatedAt
-    }))
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  return diaryDb.listDiaries();
 });
 
 ipcMain.handle('diary:save', async (_event, payload) => {
-  if (!payload?.date) {
-    throw new Error('保存失败：缺少日期');
-  }
-
-  const store = readDiaryStore();
-  const now = new Date().toISOString();
-  store[payload.date] = {
-    ...payload,
-    updatedAt: now
-  };
-  writeDiaryStore(store);
+  const saved = diaryDb.saveDiary(payload);
   return {
     ok: true,
-    diary: store[payload.date],
-    list: Object.values(store)
-      .map((diary) => ({
-        date: diary.date,
-        weekday: diary.weekday,
-        title: getDiaryTitle(diary),
-        updatedAt: diary.updatedAt
-      }))
-      .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    diary: saved,
+    list: diaryDb.listDiaries(),
   };
 });
 
 ipcMain.handle('diary:get', async (_event, date) => {
-  const store = readDiaryStore();
-  return store[date] || null;
+  return diaryDb.getDiary(date);
 });
 
 ipcMain.handle('diary:delete', async (_event, date) => {
-  const store = readDiaryStore();
-  delete store[date];
-  writeDiaryStore(store);
-  return { ok: true };
+  return diaryDb.deleteDiary(date);
 });
 
-ipcMain.handle('diary:data-path', async () => getDiaryStorePath());
+ipcMain.handle('diary:search', async (_event, payload) => {
+  const q = payload && typeof payload === 'object' ? payload.query : payload;
+  const limit = payload && typeof payload === 'object' && Number.isFinite(payload.limit) ? payload.limit : 50;
+  return diaryDb.searchDiaries(q, limit);
+});
+
+ipcMain.handle('diary:data-path', async () => path.join(getDataDir(), 'diaries.sqlite'));
 
 ipcMain.handle('weather:fetch', async (_event, payload) => fetchWeatherByCity(payload));
 
@@ -819,6 +861,15 @@ ipcMain.handle('ai:abort', async (_event, jobId) => {
 });
 
 app.whenReady().then(() => {
+  try {
+    diaryDb.open(getDataDir());
+    const result = diaryDb.migrateFromJson(getDiaryStorePath());
+    if (result.migrated > 0) {
+      console.log(`[db] 已从 diaries.json 迁移 ${result.migrated} 条记录`);
+    }
+  } catch (e) {
+    console.error('[db] 启动迁移失败：', e);
+  }
   createAppMenu();
   createWindow();
 
@@ -830,6 +881,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  diaryDb.close();
   if (process.platform !== 'darwin') {
     app.quit();
   }

@@ -79,6 +79,7 @@ export interface DiaryApi {
   exportDocxToDir: (payload: Diary & { exportDir: string }) => Promise<{ canceled: boolean; filePath?: string }>;
   selectExportDir: () => Promise<{ canceled: boolean; dir?: string }>;
   listDiaries: () => Promise<DiarySummary[]>;
+  searchDiaries: (payload: { query: string; limit?: number }) => Promise<DiarySummary[]>;
   saveDiary: (payload: Diary) => Promise<{ ok: boolean; diary: Diary; list: DiarySummary[] }>;
   getDiary: (date: string) => Promise<Diary | null>;
   deleteDiary: (date: string) => Promise<{ ok: boolean }>;
@@ -90,6 +91,9 @@ export interface DiaryApi {
   startAi: (payload: { mode: AiMode; diary: Diary; settings: AiSettings }) => Promise<string>;
   abortAi: (jobId: string) => Promise<{ ok: boolean }>;
   listOllamaModels: (endpoint: string) => Promise<{ ok: boolean; models: string[]; error?: string }>;
+  getSecret: (name: string) => Promise<{ ok: boolean; value?: string; error?: string }>;
+  setSecret: (name: string, value: string) => Promise<{ ok: boolean; encrypted?: boolean; error?: string }>;
+  clearSecret: (name: string) => Promise<{ ok: boolean; error?: string }>;
   onAiEvent: (handler: (evt: AiEvent) => void) => () => void;
 }
 

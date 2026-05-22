@@ -110,7 +110,30 @@ h2 { color: #17251f; font-size: 15px; font-weight: 700; }
 }
 .history { padding: 14px; }
 .history-head { margin-bottom: 10px; }
-.history-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; max-height: calc(100vh - 200px); overflow-y: auto; }
+.history-search {
+  position: relative;
+  margin-bottom: 10px;
+}
+.history-search input {
+  padding-right: 26px;
+  height: 32px;
+  font-size: 13px;
+}
+.history-search-clear {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #61706a;
+  font-size: 18px;
+  line-height: 1;
+}
+.history-search-clear:hover { color: #1f6b57; background: #f3f7f5; }
+.history-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; max-height: calc(100vh - 240px); overflow-y: auto; }
 .history-empty { color: #61706a; font-size: 13px; padding: 8px 0; }
 .history-item {
   position: relative;
