@@ -1,3 +1,4 @@
+// @ts-check
 const { app, BrowserWindow, Menu, dialog, ipcMain, safeStorage } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -7,6 +8,7 @@ const diaryDb = require('./db.cjs');
 const isDev = !app.isPackaged;
 
 function createAppMenu() {
+  /** @type {import('electron').MenuItemConstructorOptions[]} */
   const template = [
     {
       label: '文件',
@@ -213,7 +215,7 @@ async function fetchWeatherByCity({ city, date }) {
 
   const targetDate = date || new Date().toISOString().slice(0, 10);
   const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(keyword)}&count=1&language=zh&format=json`;
-  const geocode = await fetchJson(geocodeUrl);
+  const geocode = /** @type {any} */ (await fetchJson(geocodeUrl));
   const place = geocode.results?.[0];
 
   if (!place) {
@@ -231,12 +233,12 @@ async function fetchWeatherByCity({ city, date }) {
 
   let forecast;
   try {
-    forecast = await fetchJson(forecastUrl.toString());
+    forecast = /** @type {any} */ (await fetchJson(forecastUrl.toString()));
   } catch {
     forecastUrl.searchParams.delete('start_date');
     forecastUrl.searchParams.delete('end_date');
     forecastUrl.searchParams.set('forecast_days', '1');
-    forecast = await fetchJson(forecastUrl.toString());
+    forecast = /** @type {any} */ (await fetchJson(forecastUrl.toString()));
   }
   const availableDate = firstForecastDate(forecast);
   if (!availableDate) {
@@ -244,10 +246,10 @@ async function fetchWeatherByCity({ city, date }) {
   }
 
   const forecastDate = forecast.daily?.time?.includes(targetDate) ? targetDate : availableDate;
-  const daily = forecast.daily || {};
-  const hourly = forecast.hourly || {};
+  const daily = /** @type {any} */ (forecast.daily || {});
+  const hourly = /** @type {any} */ (forecast.hourly || {});
 
-  const dayIndex = Math.max(0, daily.time?.findIndex((time) => time === forecastDate) ?? 0);
+  const dayIndex = Math.max(0, daily.time?.findIndex(( /** @type {string} */ time) => time === forecastDate) ?? 0);
   const morningCode = pickHourlyValue(hourly, 'weather_code', forecastDate, 9);
   const afternoonCode = pickHourlyValue(hourly, 'weather_code', forecastDate, 15);
   const humidity = pickHourlyValue(hourly, 'relative_humidity_2m', forecastDate, 15);
@@ -278,7 +280,7 @@ function extractJsonObject(text) {
   const end = body.lastIndexOf('}');
 
   if (start < 0 || end < start) {
-    const err = new Error('AI 没有返回可解析的 JSON');
+    const err = /** @type {Error & { code?: string }} */ (new Error('AI 没有返回可解析的 JSON'));
     err.code = 'AI_NO_JSON';
     throw err;
   }
@@ -294,7 +296,7 @@ function extractJsonObject(text) {
     try {
       return JSON.parse(repaired);
     } catch {
-      const err = new Error(`JSON 解析失败：${e instanceof Error ? e.message : String(e)}`);
+      const err = /** @type {Error & { code?: string }} */ (new Error(`JSON 解析失败：${e instanceof Error ? e.message : String(e)}`));
       err.code = 'AI_BAD_JSON';
       throw err;
     }
@@ -867,9 +869,9 @@ ipcMain.handle('ai:list-ollama-models', async (_event, endpoint) => {
     if (!response.ok) {
       return { ok: false, error: `Ollama 响应 ${response.status}`, models: [] };
     }
-    const data = await response.json();
+    const data = /** @type {any} */ (await response.json());
     const models = Array.isArray(data?.models)
-      ? data.models.map((m) => m.name).filter(Boolean)
+      ? data.models.map(( /** @type {any} */ m) => m.name).filter(Boolean)
       : [];
     return { ok: true, models };
   } catch (e) {

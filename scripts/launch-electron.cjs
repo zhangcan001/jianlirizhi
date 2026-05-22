@@ -1,10 +1,12 @@
 #!/usr/bin/env node
+// @ts-check
 // Launches Electron with ELECTRON_RUN_AS_NODE removed from env.
 // Some machines set ELECTRON_RUN_AS_NODE=1 globally (interferes with Electron API).
 const { spawn } = require('child_process');
 const path = require('path');
 
-const electron = require('electron');
+/** @type {string} */
+const electron = /** @type {any} */ (require('electron'));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 
@@ -20,6 +22,8 @@ child.on('close', (code, signal) => {
   }
   process.exit(code);
 });
-['SIGINT', 'SIGTERM'].forEach((sig) => {
+/** @type {NodeJS.Signals[]} */
+const signals = ['SIGINT', 'SIGTERM'];
+signals.forEach((sig) => {
   process.on(sig, () => { if (!child.killed) child.kill(sig); });
 });

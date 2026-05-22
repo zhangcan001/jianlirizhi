@@ -9,7 +9,10 @@
     "dev:electron": "wait-on tcp:127.0.0.1:5173 && node scripts/launch-electron.cjs",
     "dev": "concurrently -k -n web,electron -c blue,magenta \"npm:dev:web\" \"npm:dev:electron\"",
     "build": "vite build --config frontend/vite.config.mts",
-    "preview": "vite preview --config frontend/vite.config.mts"
+    "preview": "vite preview --config frontend/vite.config.mts",
+    "check:web": "tsc --noEmit -p frontend/tsconfig.json",
+    "check:electron": "tsc -p tsconfig.electron.json",
+    "check": "npm run check:web && npm run check:electron"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
@@ -21,6 +24,8 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.4",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.19.41",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",

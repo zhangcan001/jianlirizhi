@@ -75,7 +75,7 @@ function open(dataDir) {
     CREATE INDEX IF NOT EXISTS idx_diaries_updated ON diaries(updatedAt DESC);
   `);
 
-  const existing = new Set(db.prepare('PRAGMA table_info(diaries)').all().map((r) => r.name));
+  const existing = new Set(/** @type {any[]} */ (db.prepare('PRAGMA table_info(diaries)').all()).map((r) => r.name));
   for (const c of TEXT_COLUMNS) {
     if (c === 'date') continue;
     if (!existing.has(c)) {
@@ -172,7 +172,7 @@ function deleteDiary(date) {
 function listDiaries() {
   if (!db) throw new Error('db not opened');
   const titleParts = SEARCHABLE_COLUMNS.slice(0, 4); // 取前几项里第一个非空作为标题
-  const rows = db.prepare(`
+  const rows = /** @type {any[]} */ (db.prepare(`
     SELECT date, weekday, updatedAt,
       "${titleParts[0]}" AS p0,
       "${titleParts[1]}" AS p1,
@@ -180,7 +180,7 @@ function listDiaries() {
       "${titleParts[3]}" AS p3
     FROM diaries
     ORDER BY date DESC
-  `).all();
+  `).all());
   return rows.map((r) => ({
     date: r.date,
     weekday: r.weekday || '',
@@ -203,9 +203,9 @@ function searchDiaries(query, limit = 50) {
     ORDER BY date DESC
     LIMIT ?
   `);
-  const params = SEARCHABLE_COLUMNS.map(() => like);
+  const params = /** @type {(string|number)[]} */ (SEARCHABLE_COLUMNS.map(() => like));
   params.push(limit);
-  const rows = stmt.all(...params);
+  const rows = /** @type {any[]} */ (stmt.all(...params));
   return rows.map((r) => ({
     date: r.date,
     weekday: r.weekday || '',
