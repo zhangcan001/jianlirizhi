@@ -2,6 +2,7 @@ import type { Diary } from '../types';
 import { FIELD_DEFS, weekdayOf } from '../constants';
 import { WeatherBar } from './WeatherBar';
 import { AiBar } from './AiBar';
+import { FieldHistoryButton } from './FieldHistoryButton';
 import type { AiSettings } from '../types';
 
 interface Props {
@@ -68,7 +69,12 @@ export function DiaryForm({ diary, settings, onUpdate, replaceDiary, snapshotAiF
       <div className="panel">
         {FIELD_DEFS.map((f) => (
           <label key={f.key} className="field block">
-            <span>{f.label}</span>
+            <span className="field-label-row">
+              <span>{f.label}</span>
+              {f.historyEnabled && (
+                <FieldHistoryButton field={f.key} onPick={(v) => onUpdate(f.key, v)} />
+              )}
+            </span>
             <textarea
               rows={f.rows}
               placeholder={f.placeholder}

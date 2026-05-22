@@ -37,6 +37,11 @@ export function AiBar({ diary, settings, replaceDiary, snapshotAiFields, onBusy,
     run(
       { mode, diary, settings },
       {
+        onPartial: (field, value) => {
+          if ((ALLOWED_KEYS as string[]).includes(field)) {
+            replaceDiary({ [field]: value } as Partial<Diary>);
+          }
+        },
         onDone: (result) => {
           const patch: Partial<Diary> = {};
           for (const [k, v] of Object.entries(result)) {

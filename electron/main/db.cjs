@@ -195,9 +195,9 @@ function searchDiaries(query, limit = 50) {
   if (!q) return listDiaries().slice(0, limit);
   const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
   const where = SEARCHABLE_COLUMNS.map((c) => `"${c}" LIKE ? ESCAPE '\\'`).join(' OR ');
+  const selectCols = ['date', 'weekday', 'updatedAt', ...SEARCHABLE_COLUMNS].map((c) => `"${c}"`).join(', ');
   const stmt = db.prepare(`
-    SELECT date, weekday, updatedAt,
-      "constructionStatus" AS p0, "inspectionWork" AS p1
+    SELECT ${selectCols}
     FROM diaries
     WHERE ${where}
     ORDER BY date DESC
@@ -206,12 +206,33 @@ function searchDiaries(query, limit = 50) {
   const params = /** @type {(string|number)[]} */ (SEARCHABLE_COLUMNS.map(() => like));
   params.push(limit);
   const rows = /** @type {any[]} */ (stmt.all(...params));
-  return rows.map((r) => ({
-    date: r.date,
-    weekday: r.weekday || '',
-    updatedAt: r.updatedAt || '',
-    title: (r.p0 || r.p1 || '').split(/\r?\n/)[0].slice(0, 40) || '（空）',
-  }));
+  const lowerQ = q.toLowerCase();
+  return rows.map((r) => {
+    let snippet = '';
+    let snippetField = '';
+    for (const c of SEARCHABLE_COLUMNS) {
+      const v = String(r[c] || '');
+      if (!v) continue;
+      const idx = v.toLowerCase().indexOf(lowerQ);
+      if (idx >= 0) {
+        const start = Math.max(0, idx - 30);
+        const end = Math.min(v.length, idx + q.length + 60);
+        snippet = (start > 0 ? '…' : '') + v.slice(start, end).replace(/\s+/g, ' ').trim() + (end < v.length ? '…' : '');
+        snippetField = c;
+        break;
+      }
+    }
+    const title = String(r.constructionStatus || r.inspectionWork || '').split(/\r?\n/)[0].slice(0, 40) || '（空）';
+    return {
+      date: r.date,
+      weekday: r.weekday || '',
+      updatedAt: r.updatedAt || '',
+      title,
+      snippet,
+      snippetField,
+      query: q,
+    };
+  });
 }
 
 function close() {
@@ -219,6 +240,65 @@ function close() {
     try { db.close(); } catch { /* ignore */ }
     db = null;
   }
+}
+
+function dumpAll() {
+  if (!db) throw new Error('db not opened');
+  const cols = [...TEXT_COLUMNS, 'updatedAt'].map((c) => `"${c}"`).join(', ');
+  const rows = /** @type {any[]} */ (db.prepare(`SELECT ${cols} FROM diaries ORDER BY date ASC`).all());
+  return rows.map(rowToDiary).filter(Boolean);
+}
+
+function importAll(entries) {
+  if (!db) throw new Error('db not opened');
+  if (!Array.isArray(entries)) throw new Error('备份格式错误：diaries 不是数组');
+  const insert = prepareUpsert();
+  const tx = db.transaction((items) => {
+    let n = 0;
+    for (const it of items) {
+      if (!it || !it.date) continue;
+      insert.run(buildParams(it));
+      n++;
+    }
+    return n;
+  });
+  return { imported: tx(entries) };
+}
+
+const HISTORY_ALLOWED_FIELDS = new Set([
+  'contractorPersonnel',
+  'machinery',
+  'materialAcceptance',
+  'inspectionWork',
+  'acceptanceWork',
+  'standingWork',
+  'meeting',
+  'internalWork',
+  'issuesAndActions',
+  'otherMatters',
+  'constructionStatus',
+]);
+
+function getFieldHistory(field, limit = 8) {
+  if (!db) throw new Error('db not opened');
+  if (!HISTORY_ALLOWED_FIELDS.has(field)) throw new Error('该字段不支持历史检索');
+  const n = Math.min(Math.max(1, Number(limit) || 8), 50);
+  const rows = /** @type {any[]} */ (db.prepare(`
+    SELECT date, "${field}" AS value
+    FROM diaries
+    WHERE "${field}" IS NOT NULL AND TRIM("${field}") <> ''
+    ORDER BY date DESC
+  `).all());
+  const seen = new Set();
+  const out = [];
+  for (const r of rows) {
+    const v = String(r.value || '').trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    out.push({ date: r.date, value: v });
+    if (out.length >= n) break;
+  }
+  return out;
 }
 
 module.exports = {
@@ -230,4 +310,7 @@ module.exports = {
   deleteDiary,
   listDiaries,
   searchDiaries,
+  dumpAll,
+  importAll,
+  getFieldHistory,
 };

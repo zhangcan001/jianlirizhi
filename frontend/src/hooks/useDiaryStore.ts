@@ -179,6 +179,7 @@ export function useDiaryStore(defaults?: { writer?: string }) {
     replaceDiary,
     list,
     refreshList,
+    reload: () => loadDate(currentDate),
     save,
     remove,
     dirty,

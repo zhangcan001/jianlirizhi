@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDiaryStore } from './hooks/useDiaryStore';
 import { useSettings } from './hooks/useSettings';
 import { useProject } from './hooks/useProject';
@@ -109,6 +109,66 @@ export function App() {
     }
   };
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
+      if (key === 's') {
+        e.preventDefault();
+        void handleSave();
+      } else if (key === 'e') {
+        e.preventDefault();
+        void handleExport();
+      } else if (key === 'f') {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('app:focus-search'));
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.diary]);
+
+  const handleCopyLatest = async () => {
+    const latest = store.list.find((it) => it.date < store.diary.date) || store.list.find((it) => it.date !== store.diary.date);
+    if (!latest) {
+      onError('没有可复制的历史日记');
+      return;
+    }
+    onBusy(true, `复制 ${latest.date} 的内容…`);
+    try {
+      const src = await api.getDiary(latest.date);
+      if (!src) {
+        onError('源日记加载失败');
+        onBusy(false);
+        return;
+      }
+      store.replaceDiary({
+        writer: src.writer,
+        city: src.city,
+        constructionStatus: src.constructionStatus,
+        contractorPersonnel: src.contractorPersonnel,
+        machinery: src.machinery,
+        inspectionWork: src.inspectionWork,
+        materialAcceptance: src.materialAcceptance,
+        acceptanceWork: src.acceptanceWork,
+        standingWork: src.standingWork,
+        meeting: src.meeting,
+        internalWork: src.internalWork,
+        issuesAndActions: src.issuesAndActions,
+        otherMatters: src.otherMatters,
+        chiefEngineerComments: src.chiefEngineerComments,
+        specialistSupervisorComments: src.specialistSupervisorComments,
+      });
+      onBusy(false);
+      onSuccess(`已复制 ${latest.date} 的内容（保留当前日期与天气）`);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : String(e));
+      onBusy(false);
+    }
+  };
+
   const handleExportMonth = async () => {
     const defaultMonth = (store.diary.date || new Date().toISOString().slice(0, 10)).slice(0, 7);
     const input = window.prompt('输入要导出的月份（YYYY-MM）', defaultMonth);
@@ -162,6 +222,14 @@ export function App() {
               ↺ 撤销 AI
             </button>
           )}
+          <button
+            className="ghost"
+            type="button"
+            title="把最近一篇日记的正文复制到当前日期，保留当前日期与天气"
+            onClick={handleCopyLatest}
+          >
+            复制上一篇
+          </button>
           <button className="ghost" type="button" onClick={handleChangeExportDir}>
             导出目录…
           </button>
@@ -247,6 +315,11 @@ export function App() {
         update={updateSetting}
         project={project}
         updateProject={updateProject}
+        onBackupImported={({ imported }) => {
+          void store.refreshList();
+          if (imported > 0) void store.reload();
+        }}
+        onMessage={(kind, message) => (kind === 'success' ? onSuccess(message) : onError(message))}
         onClose={() => setDrawerOpen(false)}
       />
     </div>

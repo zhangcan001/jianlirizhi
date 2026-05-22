@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AiSettings, ProjectProfile } from '../types';
+import type { AiSettings, BackupSettings, ProjectProfile } from '../types';
 import { api } from '../api';
 
 interface Props {
@@ -8,10 +8,12 @@ interface Props {
   update: <K extends keyof AiSettings>(key: K, value: AiSettings[K]) => void;
   project: ProjectProfile;
   updateProject: <K extends keyof ProjectProfile>(key: K, value: ProjectProfile[K]) => void;
+  onBackupImported: (info: { imported: number; settings?: BackupSettings }) => void;
+  onMessage: (kind: 'success' | 'error', message: string) => void;
   onClose: () => void;
 }
 
-export function SettingsDrawer({ open, settings, update, project, updateProject, onClose }: Props) {
+export function SettingsDrawer({ open, settings, update, project, updateProject, onBackupImported, onMessage, onClose }: Props) {
   const [models, setModels] = useState<string[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState<string>('');
@@ -51,6 +53,46 @@ export function SettingsDrawer({ open, settings, update, project, updateProject,
       refreshModels();
     }
   }, [open, settings.provider, refreshModels]);
+
+  const collectBackupSettings = (): BackupSettings => {
+    const keys = ['lastCity', 'exportDir', 'autoFetchWeather', 'aiSettings', 'projectProfile'] as const;
+    const out: BackupSettings = {};
+    for (const k of keys) {
+      const v = localStorage.getItem(k);
+      if (v !== null) (out as Record<string, string>)[k] = v;
+    }
+    return out;
+  };
+
+  const handleExportBackup = async () => {
+    try {
+      const res = await api.exportBackup({ settings: collectBackupSettings() });
+      if (res.canceled) return;
+      onMessage('success', `备份已写入 ${res.filePath}（${res.count ?? 0} 篇）`);
+    } catch (e) {
+      onMessage('error', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const handleImportBackup = async () => {
+    try {
+      const res = await api.importBackup();
+      if (res.canceled) return;
+      if (!res.ok) {
+        onMessage('error', res.error || '导入失败');
+        return;
+      }
+      if (res.settings) {
+        for (const [k, v] of Object.entries(res.settings)) {
+          if (typeof v === 'string') localStorage.setItem(k, v);
+        }
+      }
+      onBackupImported({ imported: res.imported ?? 0, settings: res.settings });
+      onMessage('success', `已导入 ${res.imported ?? 0} 篇，刷新设置生效后请重启应用`);
+    } catch (e) {
+      onMessage('error', e instanceof Error ? e.message : String(e));
+    }
+  };
 
   return (
     <>
@@ -114,6 +156,21 @@ export function SettingsDrawer({ open, settings, update, project, updateProject,
                 onChange={(e) => updateProject('writer', e.target.value)}
               />
             </label>
+          </section>
+
+          <section className="drawer-section">
+            <h3 className="drawer-section-title">数据备份</h3>
+            <div className="backup-actions">
+              <button className="ghost" type="button" onClick={handleExportBackup}>
+                导出备份 (.json)
+              </button>
+              <button className="ghost" type="button" onClick={handleImportBackup}>
+                从备份导入…
+              </button>
+            </div>
+            <p className="drawer-hint">
+              备份包含所有日记 + 本机设置（不含 API key）。导入时按日期 upsert，旧条目会被覆盖。
+            </p>
           </section>
 
           <section className="drawer-section">

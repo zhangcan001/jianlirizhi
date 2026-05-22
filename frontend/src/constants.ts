@@ -1,6 +1,6 @@
 import type { Diary, DiaryFieldKey, AiSettings, ProjectProfile } from './types';
 
-export const FIELD_DEFS: { key: DiaryFieldKey; label: string; placeholder: string; rows: number }[] = [
+export const FIELD_DEFS: { key: DiaryFieldKey; label: string; placeholder: string; rows: number; historyEnabled?: boolean }[] = [
   {
     key: 'constructionStatus',
     label: '今日施工情况',
@@ -12,36 +12,42 @@ export const FIELD_DEFS: { key: DiaryFieldKey; label: string; placeholder: strin
     label: '承包单位人员投入',
     placeholder: '按单位/班组逐项写：1. XX单位：XX人 ... 合计：XX人',
     rows: 4,
+    historyEnabled: true,
   },
   {
     key: 'machinery',
     label: '承包单位机械投入',
     placeholder: '按机械逐项写：1. 塔吊：1台 2. 泵车：1台 ...',
     rows: 4,
+    historyEnabled: true,
   },
   {
     key: 'inspectionWork',
     label: '巡视检查工作',
     placeholder: '巡视部位/工序、人员到岗、机械使用、质量、安全文明、问题整改与复查。',
     rows: 6,
+    historyEnabled: true,
   },
   {
     key: 'materialAcceptance',
     label: '材料验收 / 见证取样工作',
     placeholder: '默认留空。如有材料验收/见证取样再填写。',
     rows: 3,
+    historyEnabled: true,
   },
   {
     key: 'acceptanceWork',
     label: '验收工作',
     placeholder: '本日实际进行的工序/分项/隐蔽验收情况。无则填"无。"',
     rows: 3,
+    historyEnabled: true,
   },
   {
     key: 'standingWork',
     label: '旁站工作',
     placeholder: '旁站部位、工序、起止时间、旁站结论。无则填"无。"',
     rows: 3,
+    historyEnabled: true,
   },
   {
     key: 'meeting',
@@ -54,6 +60,7 @@ export const FIELD_DEFS: { key: DiaryFieldKey; label: string; placeholder: strin
     label: '内业工作',
     placeholder: '资料整理、月报/周报、台账、签字盖章等。无则填"无。"',
     rows: 3,
+    historyEnabled: true,
   },
   {
     key: 'issuesAndActions',

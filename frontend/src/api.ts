@@ -28,6 +28,9 @@ export const api: DiaryApi = (() => {
     getSecret: missing,
     setSecret: missing,
     clearSecret: missing,
+    getFieldHistory: missing,
+    exportBackup: missing,
+    importBackup: missing,
     onAiEvent: () => () => {},
   } as DiaryApi;
 })();

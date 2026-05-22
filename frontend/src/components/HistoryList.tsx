@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { DiarySummary } from '../types';
 import { api } from '../api';
 
@@ -9,10 +9,51 @@ interface Props {
   onDelete: (date: string) => void;
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  constructionStatus: '施工情况',
+  inspectionWork: '巡视检查',
+  contractorPersonnel: '人员投入',
+  machinery: '机械投入',
+  materialAcceptance: '材料验收',
+  acceptanceWork: '验收工作',
+  standingWork: '旁站工作',
+  meeting: '会议',
+  internalWork: '内业工作',
+  issuesAndActions: '问题与措施',
+  otherMatters: '其他事项',
+  chiefEngineerComments: '总工评语',
+  specialistSupervisorComments: '专监评语',
+  writer: '填写人',
+  city: '城市',
+};
+
+function renderHighlighted(text: string, query: string): ReactNode {
+  if (!query) return text;
+  const q = query.trim();
+  if (!q) return text;
+  const parts: ReactNode[] = [];
+  const lower = text.toLowerCase();
+  const lq = q.toLowerCase();
+  let i = 0;
+  let key = 0;
+  while (i < text.length) {
+    const idx = lower.indexOf(lq, i);
+    if (idx < 0) {
+      parts.push(text.slice(i));
+      break;
+    }
+    if (idx > i) parts.push(text.slice(i, idx));
+    parts.push(<mark key={key++}>{text.slice(idx, idx + q.length)}</mark>);
+    i = idx + q.length;
+  }
+  return parts;
+}
+
 export function HistoryList({ list, currentDate, onPick, onDelete }: Props) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DiarySummary[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const q = query.trim();
@@ -32,6 +73,15 @@ export function HistoryList({ list, currentDate, onPick, onDelete }: Props) {
     return () => window.clearTimeout(t);
   }, [query]);
 
+  useEffect(() => {
+    const onFocusSearch = () => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    };
+    window.addEventListener('app:focus-search', onFocusSearch);
+    return () => window.removeEventListener('app:focus-search', onFocusSearch);
+  }, []);
+
   const displayed = useMemo(() => results ?? list, [results, list]);
   const header = results === null ? `${list.length} 篇` : `${displayed.length} 条匹配`;
 
@@ -43,9 +93,10 @@ export function HistoryList({ list, currentDate, onPick, onDelete }: Props) {
       </div>
       <div className="history-search">
         <input
+          ref={inputRef}
           type="search"
           value={query}
-          placeholder="搜索内容/工种/单位…"
+          placeholder="搜索内容/工种/单位…（Ctrl+F）"
           onChange={(e) => setQuery(e.target.value)}
         />
         {query && (
@@ -69,8 +120,14 @@ export function HistoryList({ list, currentDate, onPick, onDelete }: Props) {
               <span className="history-weekday">{item.weekday}</span>
             </div>
             <div className="history-title" title={item.title}>
-              {item.title}
+              {renderHighlighted(item.title, item.query || '')}
             </div>
+            {item.snippet && (
+              <div className="history-snippet">
+                <span className="history-snippet-field">{FIELD_LABELS[item.snippetField || ''] || ''}</span>
+                <span>{renderHighlighted(item.snippet, item.query || '')}</span>
+              </div>
+            )}
             <button
               className="history-del"
               type="button"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AiEvent, AiMode, AiSettings, Diary } from '../types';
+import type { AiEvent, AiMode, AiSettings, Diary, DiaryFieldKey } from '../types';
 import { api } from '../api';
 
 interface RunArgs {
@@ -9,6 +9,7 @@ interface RunArgs {
 }
 
 interface RunCallbacks {
+  onPartial?: (field: DiaryFieldKey, value: string) => void;
   onDone?: (result: Partial<Diary>, raw: string) => void;
   onError?: (message: string, raw?: string) => void;
   onAborted?: () => void;
@@ -36,6 +37,10 @@ export function useAiJob() {
       if (!jobRef.current || evt.jobId !== jobRef.current) return;
       if (evt.type === 'chunk') {
         setState((s) => ({ ...s, progress: s.progress + evt.data }));
+        return;
+      }
+      if (evt.type === 'partial') {
+        cbsRef.current.onPartial?.(evt.data.field, evt.data.value);
         return;
       }
       const cbs = cbsRef.current;

@@ -642,6 +642,23 @@ async function callOpenAiCompatibleStream({ endpoint, apiKey, model, prompt, sig
 
 const aiJobs = new Map();
 
+const STREAM_FIELD_RE = /"(constructionStatus|contractorPersonnel|machinery|inspectionWork|materialAcceptance|acceptanceWork|standingWork|meeting|internalWork|issuesAndActions|otherMatters)"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+
+function extractCompletedFields(text) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  STREAM_FIELD_RE.lastIndex = 0;
+  let m;
+  while ((m = STREAM_FIELD_RE.exec(text)) !== null) {
+    try {
+      out[m[1]] = JSON.parse('"' + m[2] + '"');
+    } catch {
+      // value contains unsupported escape, skip until full parse at end
+    }
+  }
+  return out;
+}
+
 async function runAiJob({ jobId, mode, diary, settings, webContents }) {
   const controller = new AbortController();
   aiJobs.set(jobId, controller);
@@ -651,27 +668,39 @@ async function runAiJob({ jobId, mode, diary, settings, webContents }) {
     }
   };
   let rawText = '';
+  const emittedFields = new Set();
   try {
     const prompt = buildAiPrompt(mode, diary, settings?.glossary);
     const provider = settings?.provider || 'ollama';
-    const onDelta = (piece) => send('chunk', piece);
-    rawText =
-      provider === 'ollama'
-        ? await callOllamaStream({
-            endpoint: settings?.endpoint,
-            model: settings?.model,
-            prompt,
-            signal: controller.signal,
-            onDelta
-          })
-        : await callOpenAiCompatibleStream({
-            endpoint: settings?.endpoint,
-            apiKey: settings?.apiKey,
-            model: settings?.model,
-            prompt,
-            signal: controller.signal,
-            onDelta
-          });
+    const onDelta = (piece) => {
+      rawText += piece;
+      send('chunk', piece);
+      try {
+        const completed = extractCompletedFields(rawText);
+        for (const [k, v] of Object.entries(completed)) {
+          if (!emittedFields.has(k)) {
+            emittedFields.add(k);
+            send('partial', { field: k, value: v });
+          }
+        }
+      } catch { /* swallow partial-scan errors */ }
+    };
+    await (provider === 'ollama'
+      ? callOllamaStream({
+          endpoint: settings?.endpoint,
+          model: settings?.model,
+          prompt,
+          signal: controller.signal,
+          onDelta
+        })
+      : callOpenAiCompatibleStream({
+          endpoint: settings?.endpoint,
+          apiKey: settings?.apiKey,
+          model: settings?.model,
+          prompt,
+          signal: controller.signal,
+          onDelta
+        }));
     try {
       const parsed = extractJsonObject(rawText);
       send('done', { result: parsed, raw: rawText });
@@ -908,6 +937,71 @@ ipcMain.handle('diary:search', async (_event, payload) => {
 });
 
 ipcMain.handle('diary:data-path', async () => path.join(getDataDir(), 'diaries.sqlite'));
+
+ipcMain.handle('diary:field-history', async (_event, payload) => {
+  const field = payload && typeof payload === 'object' ? payload.field : payload;
+  const limit = payload && typeof payload === 'object' && Number.isFinite(payload.limit) ? payload.limit : 8;
+  try {
+    return { ok: true, items: diaryDb.getFieldHistory(field, limit) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e), items: [] };
+  }
+});
+
+ipcMain.handle('backup:export', async (_event, payload) => {
+  const ts = new Date();
+  const defaultName = `监理日记备份-${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}.json`;
+  const result = await dialog.showSaveDialog({
+    title: '导出备份',
+    defaultPath: defaultName,
+    filters: [{ name: 'JSON 备份', extensions: ['json'] }]
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+
+  const diaries = diaryDb.dumpAll();
+  const data = {
+    version: 1,
+    exportedAt: ts.toISOString(),
+    diaries,
+    settings: (payload && typeof payload === 'object' && payload.settings) ? payload.settings : {}
+  };
+  fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2), 'utf8');
+  return { canceled: false, filePath: result.filePath, count: diaries.length };
+});
+
+ipcMain.handle('backup:import', async () => {
+  const result = await dialog.showOpenDialog({
+    title: '导入备份',
+    properties: ['openFile'],
+    filters: [{ name: 'JSON 备份', extensions: ['json'] }]
+  });
+  if (result.canceled || !result.filePaths?.[0]) return { canceled: true };
+  const file = result.filePaths[0];
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    return { canceled: false, ok: false, error: '备份文件解析失败：' + (e instanceof Error ? e.message : String(e)) };
+  }
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.diaries)) {
+    return { canceled: false, ok: false, error: '备份格式不正确（缺少 diaries 数组）' };
+  }
+  let imported = 0;
+  try {
+    const res = diaryDb.importAll(parsed.diaries);
+    imported = res.imported || 0;
+  } catch (e) {
+    return { canceled: false, ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  return {
+    canceled: false,
+    ok: true,
+    filePath: file,
+    imported,
+    settings: parsed.settings && typeof parsed.settings === 'object' ? parsed.settings : {},
+    list: diaryDb.listDiaries()
+  };
+});
 
 ipcMain.handle('weather:fetch', async (_event, payload) => fetchWeatherByCity(payload));
 

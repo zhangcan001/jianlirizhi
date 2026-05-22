@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('diaryApi', {
   getSecret: (name) => ipcRenderer.invoke('secret:get', name),
   setSecret: (name, value) => ipcRenderer.invoke('secret:set', { name, value }),
   clearSecret: (name) => ipcRenderer.invoke('secret:clear', name),
+  getFieldHistory: (payload) => ipcRenderer.invoke('diary:field-history', payload),
+  exportBackup: (payload) => ipcRenderer.invoke('backup:export', payload),
+  importBackup: () => ipcRenderer.invoke('backup:import'),
   onAiEvent: (handler) => {
     const listener = (_e, evt) => handler(evt);
     ipcRenderer.on('ai:event', listener);
