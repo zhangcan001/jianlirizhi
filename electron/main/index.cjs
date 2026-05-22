@@ -271,15 +271,33 @@ async function fetchWeatherByCity({ city, date }) {
 function extractJsonObject(text) {
   const raw = String(text || '').trim();
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = fenced ? fenced[1].trim() : raw;
+  let body = fenced ? fenced[1].trim() : raw;
+  body = body.replace(/^[﻿​]+/, '');
   const start = body.indexOf('{');
   const end = body.lastIndexOf('}');
 
   if (start < 0 || end < start) {
-    throw new Error('AI 没有返回可解析的 JSON');
+    const err = new Error('AI 没有返回可解析的 JSON');
+    err.code = 'AI_NO_JSON';
+    throw err;
   }
 
-  return JSON.parse(body.slice(start, end + 1));
+  const candidate = body.slice(start, end + 1);
+  try {
+    return JSON.parse(candidate);
+  } catch (e) {
+    const repaired = candidate
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'");
+    try {
+      return JSON.parse(repaired);
+    } catch {
+      const err = new Error(`JSON 解析失败：${e instanceof Error ? e.message : String(e)}`);
+      err.code = 'AI_BAD_JSON';
+      throw err;
+    }
+  }
 }
 
 const PERSONNEL_CATEGORY_HINT = [
@@ -452,31 +470,69 @@ function buildDiaryCoreAnalysisPrompt(input) {
   ].join('\n');
 }
 
-async function callOllama({ endpoint, model, prompt }) {
+async function readSseLines(response, onChunk, signal) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let full = '';
+  while (true) {
+    if (signal?.aborted) {
+      try { await reader.cancel(); } catch {}
+      throw new DOMException('aborted', 'AbortError');
+    }
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
+      if (!line) continue;
+      const delta = onChunk(line);
+      if (delta) full += delta;
+    }
+  }
+  if (buffer.trim()) {
+    const delta = onChunk(buffer.trim());
+    if (delta) full += delta;
+  }
+  return full;
+}
+
+async function callOllamaStream({ endpoint, model, prompt, signal, onDelta }) {
   const url = `${String(endpoint || 'http://127.0.0.1:11434').replace(/\/$/, '')}/api/chat`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: model || 'qwen2.5:7b',
-      stream: false,
+      stream: true,
       messages: [
         { role: 'system', content: '你只返回 JSON。' },
         { role: 'user', content: prompt }
       ],
       format: 'json'
-    })
+    }),
+    signal
   });
 
   if (!response.ok) {
     throw new Error(`Ollama 请求失败：${response.status}`);
   }
 
-  const data = await response.json();
-  return data.message?.content || data.response || '';
+  return readSseLines(response, (line) => {
+    try {
+      const obj = JSON.parse(line);
+      const piece = obj.message?.content || obj.response || '';
+      if (piece) onDelta(piece);
+      return piece;
+    } catch {
+      return '';
+    }
+  }, signal);
 }
 
-async function callOpenAiCompatible({ endpoint, apiKey, model, prompt }) {
+async function callOpenAiCompatibleStream({ endpoint, apiKey, model, prompt, signal, onDelta }) {
   const baseUrl = String(endpoint || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
@@ -489,11 +545,13 @@ async function callOpenAiCompatible({ endpoint, apiKey, model, prompt }) {
     body: JSON.stringify({
       model: model || 'openrouter/free',
       temperature: 0.2,
+      stream: true,
       messages: [
         { role: 'system', content: '你是工程监理日志助手。你必须只返回 JSON，不要 Markdown。' },
         { role: 'user', content: prompt }
       ]
-    })
+    }),
+    signal
   });
 
   if (!response.ok) {
@@ -501,24 +559,75 @@ async function callOpenAiCompatible({ endpoint, apiKey, model, prompt }) {
     throw new Error(`AI 请求失败：${response.status} ${text.slice(0, 120)}`);
   }
 
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || '';
+  return readSseLines(response, (line) => {
+    if (!line.startsWith('data:')) return '';
+    const data = line.slice(5).trim();
+    if (data === '[DONE]') return '';
+    try {
+      const obj = JSON.parse(data);
+      const piece = obj.choices?.[0]?.delta?.content || '';
+      if (piece) onDelta(piece);
+      return piece;
+    } catch {
+      return '';
+    }
+  }, signal);
 }
 
-async function runAi({ mode, diary, settings }) {
-  const prompt = buildAiPrompt(mode, diary);
-  const provider = settings?.provider || 'ollama';
-  const text =
-    provider === 'ollama'
-      ? await callOllama({ endpoint: settings?.endpoint, model: settings?.model, prompt })
-      : await callOpenAiCompatible({
-          endpoint: settings?.endpoint,
-          apiKey: settings?.apiKey,
-          model: settings?.model,
-          prompt
-        });
+const aiJobs = new Map();
 
-  return extractJsonObject(text);
+async function runAiJob({ jobId, mode, diary, settings, webContents }) {
+  const controller = new AbortController();
+  aiJobs.set(jobId, controller);
+  const send = (type, data) => {
+    if (!webContents.isDestroyed()) {
+      webContents.send('ai:event', { jobId, type, data });
+    }
+  };
+  let rawText = '';
+  try {
+    const prompt = buildAiPrompt(mode, diary);
+    const provider = settings?.provider || 'ollama';
+    const onDelta = (piece) => send('chunk', piece);
+    rawText =
+      provider === 'ollama'
+        ? await callOllamaStream({
+            endpoint: settings?.endpoint,
+            model: settings?.model,
+            prompt,
+            signal: controller.signal,
+            onDelta
+          })
+        : await callOpenAiCompatibleStream({
+            endpoint: settings?.endpoint,
+            apiKey: settings?.apiKey,
+            model: settings?.model,
+            prompt,
+            signal: controller.signal,
+            onDelta
+          });
+    try {
+      const parsed = extractJsonObject(rawText);
+      send('done', { result: parsed, raw: rawText });
+    } catch (e) {
+      send('error', {
+        message: e instanceof Error ? e.message : String(e),
+        raw: rawText,
+        code: (e && e.code) || 'AI_PARSE_FAIL'
+      });
+    }
+  } catch (e) {
+    if (controller.signal.aborted) {
+      send('aborted', { message: '已取消' });
+    } else {
+      send('error', {
+        message: e instanceof Error ? e.message : String(e),
+        raw: rawText
+      });
+    }
+  } finally {
+    aiJobs.delete(jobId);
+  }
 }
 
 ipcMain.handle('diary:export-docx', async (_event, payload) => {
@@ -618,7 +727,26 @@ ipcMain.handle('diary:data-path', async () => getDiaryStorePath());
 
 ipcMain.handle('weather:fetch', async (_event, payload) => fetchWeatherByCity(payload));
 
-ipcMain.handle('ai:run', async (_event, payload) => runAi(payload));
+ipcMain.handle('ai:start', async (event, payload) => {
+  const jobId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  runAiJob({
+    jobId,
+    mode: payload?.mode,
+    diary: payload?.diary,
+    settings: payload?.settings,
+    webContents: event.sender
+  });
+  return jobId;
+});
+
+ipcMain.handle('ai:abort', async (_event, jobId) => {
+  const controller = aiJobs.get(jobId);
+  if (controller) {
+    controller.abort();
+    return { ok: true };
+  }
+  return { ok: false };
+});
 
 app.whenReady().then(() => {
   createAppMenu();

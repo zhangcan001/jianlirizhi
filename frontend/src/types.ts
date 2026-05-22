@@ -67,6 +67,12 @@ export interface WeatherResult {
 
 export type AiMode = 'polish' | 'analyze';
 
+export type AiEvent =
+  | { jobId: string; type: 'chunk'; data: string }
+  | { jobId: string; type: 'done'; data: { result: Partial<Diary>; raw: string } }
+  | { jobId: string; type: 'error'; data: { message: string; raw?: string; code?: string } }
+  | { jobId: string; type: 'aborted'; data: { message: string } };
+
 export interface DiaryApi {
   exportDocx: (payload: Diary) => Promise<{ canceled: boolean; filePath?: string }>;
   exportDocxToDir: (payload: Diary & { exportDir: string }) => Promise<{ canceled: boolean; filePath?: string }>;
@@ -77,7 +83,9 @@ export interface DiaryApi {
   deleteDiary: (date: string) => Promise<{ ok: boolean }>;
   getDataPath: () => Promise<string>;
   fetchWeather: (payload: { city: string; date: string }) => Promise<WeatherResult>;
-  runAi: (payload: { mode: AiMode; diary: Diary; settings: AiSettings }) => Promise<Partial<Diary>>;
+  startAi: (payload: { mode: AiMode; diary: Diary; settings: AiSettings }) => Promise<string>;
+  abortAi: (jobId: string) => Promise<{ ok: boolean }>;
+  onAiEvent: (handler: (evt: AiEvent) => void) => () => void;
 }
 
 declare global {

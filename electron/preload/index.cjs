@@ -10,5 +10,11 @@ contextBridge.exposeInMainWorld('diaryApi', {
   deleteDiary: (date) => ipcRenderer.invoke('diary:delete', date),
   getDataPath: () => ipcRenderer.invoke('diary:data-path'),
   fetchWeather: (payload) => ipcRenderer.invoke('weather:fetch', payload),
-  runAi: (payload) => ipcRenderer.invoke('ai:run', payload)
+  startAi: (payload) => ipcRenderer.invoke('ai:start', payload),
+  abortAi: (jobId) => ipcRenderer.invoke('ai:abort', jobId),
+  onAiEvent: (handler) => {
+    const listener = (_e, evt) => handler(evt);
+    ipcRenderer.on('ai:event', listener);
+    return () => ipcRenderer.removeListener('ai:event', listener);
+  }
 });

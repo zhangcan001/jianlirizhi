@@ -17,6 +17,8 @@ export const api: DiaryApi = (() => {
     deleteDiary: missing,
     getDataPath: missing,
     fetchWeather: missing,
-    runAi: missing,
+    startAi: missing,
+    abortAi: missing,
+    onAiEvent: () => () => {},
   } as DiaryApi;
 })();

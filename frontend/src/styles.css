@@ -179,6 +179,35 @@ h2 { color: #17251f; font-size: 15px; font-weight: 700; }
 }
 .ai-hint { color: #61706a; font-size: 12px; margin-left: auto; }
 
+.ai-failure {
+  background: #fff7f5;
+  border: 1px solid #f0c1ba;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+.ai-failure-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px;
+}
+.ai-failure-head strong { color: #9b3f35; font-size: 13px; }
+.ai-failure-actions { display: flex; gap: 6px; }
+.ai-failure-actions button { height: 28px; padding: 0 10px; font-size: 12px; }
+.ai-failure-raw {
+  background: #fff;
+  border: 1px solid #f0d4ce;
+  border-radius: 4px;
+  padding: 8px;
+  font-family: 'Microsoft YaHei', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #2a1815;
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+}
+
 .preview { padding: 14px; }
 .preview-head { margin-bottom: 8px; }
 .preview pre {
