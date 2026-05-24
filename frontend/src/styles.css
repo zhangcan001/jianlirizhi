@@ -585,6 +585,23 @@ h2 { color: var(--text); font-size: 13px; font-weight: 600; }
 
 /* === Field history popover === */
 .field-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.field-actions { display: inline-flex; align-items: center; gap: 6px; }
+.field-clear-trigger {
+  height: 22px; padding: 0 10px; font-size: 10px; font-weight: 600;
+  background: rgba(255, 75, 110, 0.08);
+  border: 1px solid rgba(255, 75, 110, 0.32);
+  color: var(--danger);
+  border-radius: 2px;
+  letter-spacing: 0.10em;
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+.field-clear-trigger:hover {
+  background: rgba(255, 75, 110, 0.18);
+  border-color: var(--danger);
+  color: var(--danger);
+  text-shadow: 0 0 8px rgba(255, 75, 110, 0.55);
+}
 .field-history { position: relative; display: inline-block; }
 .field-history-trigger {
   height: 22px; padding: 0 10px; font-size: 10px; font-weight: 600;

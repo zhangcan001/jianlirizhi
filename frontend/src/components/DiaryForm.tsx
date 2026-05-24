@@ -71,9 +71,25 @@ export function DiaryForm({ diary, settings, onUpdate, replaceDiary, snapshotAiF
           <label key={f.key} className="field block">
             <span className="field-label-row">
               <span>{f.label}</span>
-              {f.historyEnabled && (
-                <FieldHistoryButton field={f.key} onPick={(v) => onUpdate(f.key, v)} />
-              )}
+              <span className="field-actions">
+                {diary[f.key] && (
+                  <button
+                    type="button"
+                    className="field-clear-trigger"
+                    title="清空当前字段"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onUpdate(f.key, '');
+                    }}
+                  >
+                    × 清空
+                  </button>
+                )}
+                {f.historyEnabled && (
+                  <FieldHistoryButton field={f.key} onPick={(v) => onUpdate(f.key, v)} />
+                )}
+              </span>
             </span>
             <textarea
               rows={f.rows}
